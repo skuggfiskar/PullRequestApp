@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 import tkinter.font
 import requests
-import json
+import json5
 
 class PullRequestApp:
     DESCRIPTION_ROWS = 2
@@ -32,7 +32,7 @@ class PullRequestApp:
 
     def load_config(self):
         with open("config.json", "r") as file:
-            config = json.load(file)
+            config = json5.load(file)
             self.repositories = config["repositories"]
             self.DESCRIPTION_ROWS = config["UI"]["description"]["rows-visible"]
 
