@@ -52,7 +52,19 @@ class PullRequestApp:
             url = f"{base_url}{repo}/pulls"
             response = requests.get(url, headers=headers)
             if response.status_code == 200:
-                pull_requests.extend(response.json())
+                prs = response.json()
+                for pr in prs:
+                    pr['repo_name'] = repo.split('/')[-1]
+                    pr['author'] = pr['user']['login']
+
+                    reviews_url = pr['url'] + "/reviews"
+                    reviews_response = requests.get(reviews_url, headers=headers)
+                    if reviews_response.status_code == 200:
+                        reviews = reviews_response.json()
+                        approvals = [r for r in reviews if r['state'] == 'APPROVED']
+                        pr['num_approvals'] = len(approvals)
+
+                pull_requests.extend(prs)
             else:
                 print(f"Error fetching pull requests from {repo}: {response.text}")
 
@@ -103,6 +115,11 @@ class PullRequestApp:
             pr_title = pr["title"]
             pr_description = pr["body"] or ""  # Handle None values for pr_description
             pr_url = pr["html_url"]
+            author = pr["author"]
+            num_approvals = pr["num_approvals"]
+            repo_name = pr["repo_name"]
+
+            pr_info = f"Author: {author} | Approvals: {num_approvals} | Repo: {repo_name}"
 
             # Update the max_text_width if necessary
             text_width = max(self.font_title.measure(pr_title), self.font_desc.measure(pr_description))
@@ -115,9 +132,9 @@ class PullRequestApp:
 
             desc_text = tk.Text(self.list_frame, wrap="word", height=self.DESCRIPTION_ROWS, bg="#f0f0f0", bd=0, padx=4)
             if pr_description:
-                desc_text.insert(tk.END, pr_description)
+                desc_text.insert(tk.END, f"{pr_info}\n{pr_description}")
             else:
-                desc_text.insert(tk.END, "No description provided.")
+                desc_text.insert(tk.END, f"{pr_info}\nNo description provided.")
             desc_text.config(state="disabled")
             desc_text.pack(pady=(0, 0), padx=0, ipady=0, anchor="w", fill="both", expand=True)
 
@@ -127,6 +144,8 @@ class PullRequestApp:
         # Bind the <Configure> event of the canvas to adjust the wraplength of desc_label
         self.canvas.bind("<Configure>", self.adjust_wraplength)
 
+        # Bind the <Configure> event of the canvas to adjust the wraplength of desc_label
+        self.canvas.bind("<Configure>", self.adjust_wraplength)
 
     def adjust_wraplength(self, event):
         for widget in self.list_frame.winfo_children():
