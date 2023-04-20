@@ -1,5 +1,10 @@
 {
     "repositories": [
         "skuggfiskar/PullRequestApp"
-    ]
+    ],
+    "UI": {
+        "description": {
+            "rows-visible": 2
+        }
+    }
 }
