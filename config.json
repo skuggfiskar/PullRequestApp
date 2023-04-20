@@ -6,5 +6,6 @@
         "description": {
             "rows-visible": 2
         }
-    }
+    },
+    "show-only-not-reviewed-by-me": true,
 }

@@ -35,6 +35,7 @@ class PullRequestApp:
             config = json5.load(file)
             self.repositories = config["repositories"]
             self.DESCRIPTION_ROWS = config["UI"]["description"]["rows-visible"]
+            self.filter_not_reviewed_by_me = config["show-only-not-reviewed-by-me"]
 
     def load_pat(self):
         with open("secret_pat.txt", "r") as file:
@@ -48,11 +49,17 @@ class PullRequestApp:
             "Accept": "application/vnd.github+json",
         }
 
+        # Get the user login
+        if self.filter_not_reviewed_by_me:
+            user_response = requests.get("https://api.github.com/user", headers=headers)
+            user_login = user_response.json()["login"]
+
         for repo in self.repositories:
             url = f"{base_url}{repo}/pulls"
             response = requests.get(url, headers=headers)
             if response.status_code == 200:
                 prs = response.json()
+                filtered_pull_requests = []
                 for pr in prs:
                     pr['repo_name'] = repo.split('/')[-1]
                     pr['author'] = pr['user']['login']
@@ -64,7 +71,17 @@ class PullRequestApp:
                         approvals = [r for r in reviews if r['state'] == 'APPROVED']
                         pr['num_approvals'] = len(approvals)
 
-                pull_requests.extend(prs)
+                        # Check if the user has already reviewed the PR
+                        if self.filter_not_reviewed_by_me:
+                            # TODO: check the approved state
+                            already_reviewed = any(review["user"]["login"] == user_login for review in reviews)
+
+                            if not already_reviewed:
+                                filtered_pull_requests.append(pr)
+                        else:
+                            filtered_pull_requests.append(pr)
+
+                pull_requests.extend(filtered_pull_requests)
             else:
                 print(f"Error fetching pull requests from {repo}: {response.text}")
 
