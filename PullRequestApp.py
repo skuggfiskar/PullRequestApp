@@ -1,8 +1,10 @@
+import threading
 import tkinter as tk
 from tkinter import ttk
 import tkinter.font
 import requests
 import json5
+import datetime
 
 class PullRequestApp:
     DESCRIPTION_ROWS = 2
@@ -22,13 +24,20 @@ class PullRequestApp:
         self.load_config()
         self.load_pat()
 
-        self.pull_requests = self.get_pull_requests()
-
-        self.counter_label = tk.Label(self.frame, text=f"Total Pull Requests: {len(self.pull_requests)}", font=("Arial", 10), bg="#f0f0f0")
+        self.counter_label = tk.Label(self.frame, text="Total Pull Requests: ...", font=("Arial", 10), bg="#f0f0f0")
         self.counter_label.pack(pady=0)
 
+        self.refresh_button = tk.Button(self.frame, text="Refresh", command=self.refresh_list, state="disabled")
+        self.refresh_button.pack(padx=(10, 0))
+
         self.create_scrollable_list()
-        self.display_pull_requests()
+
+        # Load the pull requests list in the background
+        self.load_pull_requests()
+
+        self.refresh_job = None
+        self.refresh_interval = self.refresh_interval
+        self.load_pull_requests()
 
     def load_config(self):
         with open("config.json", "r") as file:
@@ -36,10 +45,60 @@ class PullRequestApp:
             self.repositories = config["repositories"]
             self.DESCRIPTION_ROWS = config["UI"]["description"]["rows-visible"]
             self.filter_not_reviewed_by_me = config["show-only-not-reviewed-by-me"]
+            self.refresh_interval = config["seconds-between-automatic-refresh"]
 
     def load_pat(self):
         with open("secret_pat.txt", "r") as file:
             self.pat = file.readline().strip()
+
+    def load_pull_requests(self):
+        # Disable the refresh button during loading
+        self.refresh_button.config(state="disabled")
+        self.counter_label.config(text="Loading...")
+
+        # Use a separate thread to load the pull requests
+        load_thread = threading.Thread(target=self.fetch_pull_requests)
+        load_thread.start()
+    
+    def fetch_pull_requests(self):
+        self.pull_requests = self.get_pull_requests()
+
+        # Update the UI after loading
+        self.master.after(0, self.update_list)
+
+        # Schedule the next refresh after loading
+        self.schedule_refresh()
+
+    def schedule_refresh(self):
+        if self.refresh_job:
+            # Cancel the previous refresh job
+            self.master.after_cancel(self.refresh_job)
+        self.refresh_job = self.master.after(self.refresh_interval * 1000, self.refresh_list)
+
+    def clear_list(self):
+        # Remove all children of list_frame
+        for widget in self.list_frame.winfo_children():
+            widget.destroy()
+
+    def update_list(self):
+        self.clear_list()  # Clear the existing list
+        self.display_pull_requests()
+
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%H:%M")
+        self.counter_label.config(text=f"Total Pull Requests: {len(self.pull_requests)} | Last refresh: {timestamp}")
+
+        # Enable the refresh button after loading
+        self.refresh_button.config(state="normal")
+
+    def refresh_list(self):
+        # Disable the refresh button during loading
+        self.refresh_button.config(state="disabled")
+        self.counter_label.config(text="Refreshing...")
+
+        # Use a separate thread to load the pull requests
+        load_thread = threading.Thread(target=self.fetch_pull_requests)
+        load_thread.start()
 
     def get_pull_requests(self):
         pull_requests = []

@@ -8,4 +8,5 @@
         }
     },
     "show-only-not-reviewed-by-me": true,
+    "seconds-between-automatic-refresh": 3600
 }
