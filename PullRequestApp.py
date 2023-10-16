@@ -6,6 +6,24 @@ import requests
 import json5
 import datetime
 
+class Result:
+    def __init__(self, success: bool):
+        self.success = success
+    def result(self):
+        raise NotImplementedError
+class Success(Result):
+    def __init__(self, results: list):
+        super().__init__(True)
+        self.results = results
+    def result(self):
+        return self.results
+class Failure(Result):
+    def __init__(self, error: str):
+        super().__init__(False)
+        self.error = error
+    def result(self):
+        return self.error
+
 class PullRequestApp:
     DESCRIPTION_ROWS = 2
     def __init__(self, master):
@@ -61,7 +79,19 @@ class PullRequestApp:
         load_thread.start()
     
     def fetch_pull_requests(self):
-        self.pull_requests = self.get_pull_requests()
+        result = self.get_pull_requests()
+
+        if type(result) is Failure:
+            print(result.error)
+            self.pull_requests = []
+            self.counter_label.config(text=result.error)
+            return
+
+        if type(result) is Success:
+            self.pull_requests = result.result()
+        else:
+            raise Exception("Unexpected result type")
+
 
         # Update the UI after loading
         self.master.after(0, self.update_list)
@@ -100,7 +130,7 @@ class PullRequestApp:
         load_thread = threading.Thread(target=self.fetch_pull_requests)
         load_thread.start()
 
-    def get_pull_requests(self):
+    def get_pull_requests(self) -> Result:
         pull_requests = []
         base_url = "https://api.github.com/repos/"
         headers = {
@@ -111,6 +141,8 @@ class PullRequestApp:
         # Get the user login
         if self.filter_not_reviewed_by_me:
             user_response = requests.get("https://api.github.com/user", headers=headers)
+            if user_response.status_code != 200:
+                return Failure(f"Error: {user_response.status_code} {user_response.text}")
             user_login = user_response.json()["login"]
 
         for repo in self.repositories:
@@ -144,7 +176,7 @@ class PullRequestApp:
             else:
                 print(f"Error fetching pull requests from {repo}: {response.text}")
 
-        return pull_requests
+        return Success(pull_requests)
 
     def create_scrollable_list(self):
         self.max_text_width = 0
