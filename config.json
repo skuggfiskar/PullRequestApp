@@ -1,6 +1,6 @@
 {
     "repositories": [
-        "skuggfiskar/PullRequestApp"
+        "episerver/tool-pull-request-app"
     ],
     "UI": {
         "description": {
